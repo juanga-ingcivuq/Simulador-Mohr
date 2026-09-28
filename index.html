@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>Simulador del círculo de Mohr – Mecánica de suelos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#fafaf7;--fg:#1d1d1b;--card:#fff;--bd:#d9d7cf;--ac:#1f6feb;--rd:#c0392b;--gr:#1e8e5a;--mu:#6b6a63}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#16171a;--fg:#ecebe6;--card:#1f2024;--bd:#3a3b41;--ac:#5aa2ff;--rd:#ff7b6b;--gr:#4cc98a;--mu:#a4a39c}}
+:root[data-theme="dark"]{--bg:#16171a;--fg:#ecebe6;--card:#1f2024;--bd:#3a3b41;--ac:#5aa2ff;--rd:#ff7b6b;--gr:#4cc98a;--mu:#a4a39c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem;margin:0 0 4px}p.s{color:var(--mu);margin:0 0 14px;font-size:.88rem}
+.g{display:grid;grid-template-columns:260px 1fr;gap:14px}@media(max-width:760px){.g{grid-template-columns:1fr}}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px}
+label{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0;font-size:.9rem}
+input[type=number]{width:90px;padding:4px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg)}
+input[type=range]{width:100%}
+svg{width:100%;height:auto;display:block}
+table{width:100%;border-collapse:collapse;font-size:.88rem;margin-top:10px}td{padding:3px 4px;border-bottom:1px solid var(--bd)}td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.ok{color:var(--gr);font-weight:600}.no{color:var(--rd);font-weight:600}
+.n{font-size:.78rem;color:var(--mu);margin-top:8px}
+</style></head><body><main>
+<h1>Simulador del círculo de Mohr — Mecánica de suelos</h1>
+<p class="s">Convención: compresión (+), cortante positivo si produce giro antihorario. Esfuerzos en kPa, ángulos en grados.</p>
+<div class="g">
+<div class="c">
+<label>Datos de entrada <select id="m"><option value="p">σ₁, σ₃</option><option value="g">σx, σz, τxz</option></select></label>
+<div id="pp"><label>σ₁ total <input type="number" id="s1" value="300"></label>
+<label>σ₃ total <input type="number" id="s3" value="100"></label></div>
+<div id="gg" style="display:none"><label>σx total <input type="number" id="sx" value="250"></label>
+<label>σz total <input type="number" id="sz" value="150"></label>
+<label>τxz (antihorario +) <input type="number" id="txz" value="50"></label></div>
+<label>u (presión de poros) <input type="number" id="u" value="0"></label>
+<label>c′ (cohesión) <input type="number" id="c" value="0" min="0"></label>
+<label>φ′ (°) <input type="number" id="f" value="30" min="0" max="89"></label>
+<label><span id="al"></span>: <b id="av"></b>°</label>
+<input type="range" id="a" min="0" max="180" step="1" value="60">
+<table id="r"></table>
+<div class="n">α se mide antihorario desde el plano donde actúa σ₁ (plano principal mayor).
+σ = (σ₁+σ₃)/2 + (σ₁−σ₃)/2·cos2α ; τ = (σ₁−σ₃)/2·sin2α. Se trabaja con esfuerzos efectivos σ′ = σ − u. Modo general: σθ = C + D·cos2θ − τxz·sin2θ ; τθ = D·sin2θ + τxz·cos2θ (C=(σx+σz)/2, D=(σx−σz)/2), con θ antihorario desde el plano donde actúa σx y τxz positivo si es antihorario en la cara x. Puntos X(σx, τxz) y Z(σz, −τxz).</div>
+</div>
+<div class="c"><svg id="v" viewBox="0 0 640 400" role="img" aria-label="Círculo de Mohr"></svg></div>
+</div></main>
+<script>
+const $=id=>document.getElementById(id),R2=Math.PI/180,fm=x=>x.toFixed(1);
+function draw(){
+ const gm=$('m').value==='g';$('pp').style.display=gm?'none':'';$('gg').style.display=gm?'':'none';
+ const u=+$('u').value,c=Math.max(0,+$('c').value),f=+$('f').value,al=+$('a').value;
+ $('av').textContent=al;$('al').textContent=gm?'Plano θ (desde el plano x)':'Plano α (desde el plano de σ₁)';
+ const ex=(gm?+$('sx').value:+$('s1').value)-u,ez=(gm?+$('sz').value:+$('s3').value)-u,txz=gm?+$('txz').value:0;
+ const C=(ex+ez)/2,D=(ex-ez)/2,R=Math.hypot(D,txz),e1=C+R,e3=C-R,t=Math.tan(f*R2),Nf=Math.pow(Math.tan((45+f/2)*R2),2);
+ const lo=Math.min(0,e3),hi=Math.max(0,e1),sp=Math.max(hi-lo,1),xmin=lo-.08*sp,xmax=hi+.08*sp;
+ const ym=Math.max(Math.abs(R)*1.3,1),k=Math.min(570/(xmax-xmin),175/ym),PX=s=>35+(s-xmin)*k,PY=v=>200-v*k;
+ let g='';
+ g+=`<line x1="0" y1="200" x2="640" y2="200" stroke="var(--mu)"/><line x1="${PX(0)}" y1="0" x2="${PX(0)}" y2="400" stroke="var(--mu)"/>`;
+ g+=`<text x="626" y="192" fill="var(--mu)" font-size="12" text-anchor="end">σ′</text><text x="${PX(0)+6}" y="14" fill="var(--mu)" font-size="12">τ</text>`;
+ [-1,1].forEach(sg=>{g+=`<line x1="${PX(xmin)}" y1="${PY(sg*(c+xmin*t))}" x2="${PX(xmax)}" y2="${PY(sg*(c+xmax*t))}" stroke="var(--rd)" stroke-width="2" stroke-dasharray="6 4"/>`});
+ if(R>0&&(gm||ex>=ez)){
+  g+=`<circle cx="${PX(C)}" cy="200" r="${R*k}" fill="var(--ac)" fill-opacity=".08" stroke="var(--ac)" stroke-width="2"/>`;
+  const b=2*al*R2,sa=C+D*Math.cos(b)-txz*Math.sin(b),ta=D*Math.sin(b)+txz*Math.cos(b);
+  if(gm){g+=`<line x1="${PX(ex)}" y1="${PY(txz)}" x2="${PX(ez)}" y2="${PY(-txz)}" stroke="var(--fg)" stroke-dasharray="2 3"/>`;[['X',ex,txz],['Z',ez,-txz]].forEach(q=>{g+=`<circle cx="${PX(q[1])}" cy="${PY(q[2])}" r="4" fill="var(--fg)"/><text x="${PX(q[1])+7}" y="${PY(q[2])-6}" fill="var(--fg)" font-size="12" font-weight="600">${q[0]}</text>`})}
+  g+=`<line x1="${PX(C)}" y1="200" x2="${PX(sa)}" y2="${PY(ta)}" stroke="var(--ac)"/><line x1="${PX(sa)}" y1="${PY(ta)}" x2="${PX(sa)}" y2="200" stroke="var(--ac)" stroke-dasharray="3 3"/>`;
+  g+=`<circle cx="${PX(sa)}" cy="${PY(ta)}" r="5" fill="var(--ac)"/><text x="${PX(sa)+8}" y="${PY(ta)-8}" fill="var(--ac)" font-size="12">(σ′α, τα)</text>`;
+  const sf=C-R*Math.sin(f*R2),tf=R*Math.cos(f*R2);
+  g+=`<circle cx="${PX(sf)}" cy="${PY(tf)}" r="5" fill="var(--gr)"/><text x="${PX(sf)+8}" y="${PY(tf)-8}" fill="var(--gr)" font-size="12">plano crítico</text>`;
+  g+=`<circle cx="${PX(e3)}" cy="200" r="4" fill="var(--fg)"/><circle cx="${PX(e1)}" cy="200" r="4" fill="var(--fg)"/>`;
+  g+=`<text x="${PX(e3)}" y="218" fill="var(--fg)" font-size="12" text-anchor="middle">σ₃′</text><text x="${PX(e1)}" y="218" fill="var(--fg)" font-size="12" text-anchor="middle">σ₁′</text>`;
+  const s1f=e3*Nf+2*c*Math.sqrt(Nf),q=e1-e3,qf=s1f-e3,FS=qf/q,fail=e1>=s1f-1e-9;
+  const rows=[...(gm?[['σx′ , σz′ , τxz',fm(ex)+' , '+fm(ez)+' , '+fm(txz)],['θ₁ (plano de σ₁ desde plano x)',fm(-Math.atan2(txz,D)/2/R2)+'°']]:[]),['σ₁′ , σ₃′',fm(e1)+' , '+fm(e3)],['Centro (σ₁′+σ₃′)/2',fm(C)],['Radio (τmáx)',fm(R)],['σ′α',fm(sa)],['τα',fm(ta)],['α de falla = 45+φ′/2',fm(45+f/2)+'°'],['σ′ff en falla',fm(sf)],['τff en falla',fm(tf)],['σ₁′ de falla',fm(s1f)],['FS (Δσ resistente / actuante)',isFinite(FS)?FS.toFixed(2):'—']];
+  $('r').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')+`<tr><td colspan="2" class="${fail?'no':'ok'}">${fail?'El círculo alcanza/excede la envolvente: falla':'Estado estable: círculo bajo la envolvente'}</td></tr>`;
+ }else{$('r').innerHTML='<tr><td colspan="2" class="no">Se requiere σ₁ &gt; σ₃</td></tr>'}
+ $('v').innerHTML=g;
+}
+document.querySelectorAll('input,select').forEach(i=>i.addEventListener('input',draw));draw();
+</script></body></html>
